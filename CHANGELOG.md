@@ -15,3 +15,10 @@ Initial release.
   reachable deadlock for scripting.
 - `e` edits the net in `$EDITOR` and reloads on return.
 - Examples: mutex, producer/consumer, dining philosophers.
+
+## 0.1.1
+
+- Layout rework after real-screen feedback: compact bordered panes sized to
+  the net (no more content scattered across a huge terminal), focused pane
+  shown by border colour, high-contrast selection bar, empty places shown
+  as `·`, and the trace pane (titled, explained) fills the remaining height.

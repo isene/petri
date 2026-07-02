@@ -311,7 +311,9 @@ struct App {
     msg: Option<String>,
 }
 
-const LOG_ROWS: u16 = 5;
+const C_BORDER_FOCUS: u16 = 75;
+const C_BORDER_DIM: u16 = 238;
+const C_SEL_BG: u16 = 24;
 
 impl App {
     fn new(net: Net, file: Option<String>) -> Self {
@@ -331,7 +333,7 @@ impl App {
             header: Pane::new(1, 1, 80, 1, 231, C_HEADER_BG),
             places: Pane::new(1, 2, 40, 20, 250, 234),
             trans: Pane::new(41, 2, 40, 20, 250, 233),
-            logp: Pane::new(1, 22, 80, LOG_ROWS, C_LOG, 232),
+            logp: Pane::new(1, 22, 80, 5, C_LOG, 232),
             status: Pane::new(1, 27, 80, 1, 250, 236),
             msg: None,
         };
@@ -339,19 +341,43 @@ impl App {
         app
     }
 
+    /// Compact, bordered layout anchored top-left: panes sized to the net,
+    /// the trace filling the leftover height. On a big terminal the content
+    /// stays together instead of scattering into the corners.
     fn layout(&mut self) {
         let (cols, rows) = Crust::terminal_size();
-        let rows = rows.max(10);
-        let half = cols / 2;
-        let main_h = rows.saturating_sub(2 + LOG_ROWS).max(3);
+        let rows = rows.max(14);
+        let cols = cols.max(60);
+
+        // widths sized to content
+        let max_pname = self.net.places.iter().map(|p| p.name.len()).max().unwrap_or(6);
+        let max_tname = self.net.trans.iter().map(|t| t.name.len()).max().unwrap_or(6).max(8);
+        let max_arcs = (0..self.net.trans.len())
+            .map(|t| self.net.arcs_str(t).chars().count())
+            .max()
+            .unwrap_or(10);
+        let wp = ((max_pname + 20) as u16).clamp(24, cols / 2 - 4);
+        let xt = 2 + wp + 3;
+        let wt = ((max_tname + max_arcs + 8) as u16).min(cols - xt - 1).max(20);
+
+        // heights: panes hug the item count, trace takes the rest
+        let items = self.net.places.len().max(self.net.trans.len()) as u16;
+        let main_h = (items + 1).clamp(4, rows.saturating_sub(12).max(4));
+        let log_y = 3 + main_h + 2;
+        let log_h = rows.saturating_sub(log_y + 2).max(2);
+
         self.header = Pane::new(1, 1, cols, 1, 231, C_HEADER_BG);
-        self.places = Pane::new(1, 2, half, main_h, 250, 234);
-        self.trans = Pane::new(half + 1, 2, cols - half, main_h, 250, 233);
-        self.logp = Pane::new(1, 2 + main_h, cols, LOG_ROWS, C_LOG, 232);
+        self.places = Pane::new(2, 3, wp, main_h, 250, 233);
+        self.trans = Pane::new(xt, 3, wt, main_h, 250, 233);
+        self.logp = Pane::new(2, log_y, cols - 2, log_h, C_LOG, 233);
         self.status = Pane::new(1, rows, cols, 1, 250, 236);
         for p in [&mut self.header, &mut self.places, &mut self.trans, &mut self.logp, &mut self.status] {
             p.scroll = false;
             p.wrap = false;
+        }
+        for p in [&mut self.places, &mut self.trans, &mut self.logp] {
+            p.border = true;
+            p.border_fg = Some(C_BORDER_DIM);
         }
         Crust::clear_screen();
     }
@@ -403,32 +429,43 @@ impl App {
         ));
         self.header.refresh();
 
+        // --- pane borders show focus ---
+        self.places.border_fg = Some(if self.focus == Focus::Places { C_BORDER_FOCUS } else { C_BORDER_DIM });
+        self.trans.border_fg = Some(if self.focus == Focus::Trans { C_BORDER_FOCUS } else { C_BORDER_DIM });
+        self.places.border_refresh();
+        self.trans.border_refresh();
+        self.logp.border_refresh();
+
         // --- places ---
-        let mut pl = String::from(" PLACES\n");
+        let name_w = self.net.places.iter().map(|p| p.name.len()).max().unwrap_or(6).max(6);
+        let mut pl = String::from(" \x1b[1mPLACES\x1b[0m\n");
         for (i, p) in self.net.places.iter().enumerate() {
             let n = self.marking[i];
-            let dots = if n <= 12 {
+            let dots = if n == 0 {
+                "\u{00b7}".to_string()
+            } else if n <= 12 {
                 "\u{25cf}".repeat(n as usize)
             } else {
                 format!("\u{25cf}\u{00d7}{}", n)
             };
             let sel = self.focus == Focus::Places && i == self.pidx;
-            let line = format!(
-                "{}{:<14} \x1b[38;5;{}m{}\x1b[0m",
-                if sel { "\x1b[7m" } else { "" },
+            let selpre = if sel { format!("\x1b[48;5;{}m\x1b[38;5;231m", C_SEL_BG) } else { format!("\x1b[38;5;{}m", C_PLACE) };
+            pl.push_str(&format!(
+                " {}{:<nw$}  \x1b[38;5;{}m{}\x1b[0m\n",
+                selpre,
                 p.name,
-                C_TOKEN,
-                dots
-            );
-            pl.push_str(&format!(" \x1b[38;5;{}m{}\x1b[0m\n", C_PLACE, line));
+                if n == 0 { C_DISABLED } else { C_TOKEN },
+                dots,
+                nw = name_w
+            ));
         }
         self.places.set_text(&pl);
-        // keep selection in view
-        self.places.ix = self.pidx.saturating_sub(self.places.h as usize - 3);
+        self.places.ix = (self.pidx + 2).saturating_sub(self.places.h as usize);
         self.places.refresh();
 
         // --- transitions ---
-        let mut tl = String::from(" TRANSITIONS\n");
+        let tname_w = self.net.trans.iter().map(|t| t.name.len()).max().unwrap_or(8).max(8);
+        let mut tl = String::from(" \x1b[1mTRANSITIONS\x1b[0m\n");
         for (t, tr) in self.net.trans.iter().enumerate() {
             let is_en = en.contains(&t);
             let confl = is_en && self.net.conflicts(&self.marking, t, &en);
@@ -440,28 +477,31 @@ impl App {
             } else {
                 ("\u{00b7}", C_DISABLED)
             };
+            let selpre = if sel { format!("\x1b[48;5;{}m", C_SEL_BG) } else { String::new() };
+            let namecol = if sel { 231 } else if is_en { 250 } else { C_DISABLED };
             tl.push_str(&format!(
-                " {}\x1b[38;5;{}m{} {:<12}\x1b[0m \x1b[38;5;{}m{}\x1b[0m\n",
-                if sel { "\x1b[7m" } else { "" },
+                " {}\x1b[38;5;{}m{} \x1b[38;5;{}m{:<tw$} \x1b[38;5;{}m{}\x1b[0m\n",
+                selpre,
                 col,
                 mark,
+                namecol,
                 tr.name,
                 if is_en { 250 } else { C_DISABLED },
-                self.net.arcs_str(t)
+                self.net.arcs_str(t),
+                tw = tname_w
             ));
         }
         self.trans.set_text(&tl);
-        self.trans.ix = self.tidx.saturating_sub(self.trans.h as usize - 3);
+        self.trans.ix = (self.tidx + 2).saturating_sub(self.trans.h as usize);
         self.trans.refresh();
 
-        // --- log ---
+        // --- trace ---
+        let cap = (self.logp.h as usize).saturating_sub(1).max(1);
         let lines: Vec<&str> = self.log.iter().map(|s| s.as_str()).collect();
-        let tail = if lines.len() > LOG_ROWS as usize {
-            &lines[lines.len() - LOG_ROWS as usize..]
-        } else {
-            &lines[..]
-        };
-        self.logp.set_text(&tail.join("\n"));
+        let tail = if lines.len() > cap { &lines[lines.len() - cap..] } else { &lines[..] };
+        let mut lg = String::from(" \x1b[1mTRACE\x1b[0m  (the run so far \u{2014} one path through the branching tree)\n");
+        lg.push_str(&tail.join("\n"));
+        self.logp.set_text(&lg);
         self.logp.refresh();
 
         // --- status ---
