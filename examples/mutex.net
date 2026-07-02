@@ -1,0 +1,12 @@
+# Mutual exclusion — two processes, one lock.
+# The two enter transitions CONFLICT on the lock token:
+# the net cannot decide who gets it. You do.
+
+idle1 = 1
+idle2 = 1
+lock = 1
+
+enter1: idle1 lock -> crit1
+exit1:  crit1 -> idle1 lock
+enter2: idle2 lock -> crit2
+exit2:  crit2 -> idle2 lock

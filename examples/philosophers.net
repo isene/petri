@@ -1,0 +1,16 @@
+# Two dining philosophers, each taking the left fork first.
+# This net CAN deadlock: both pick up their first fork and starve.
+# Run analysis (a) — it finds the dead marking.
+
+fork1 = 1
+fork2 = 1
+think1 = 1
+think2 = 1
+
+p1_take_f1: think1 fork1 -> has1
+p1_take_f2: has1 fork2 -> eat1
+p1_done:    eat1 -> think1 fork1 fork2
+
+p2_take_f2: think2 fork2 -> has2
+p2_take_f1: has2 fork1 -> eat2
+p2_done:    eat2 -> think2 fork1 fork2

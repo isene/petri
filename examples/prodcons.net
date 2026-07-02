@@ -1,0 +1,7 @@
+# Producer/consumer over a bounded buffer of 3 slots.
+# Live, deadlock-free, 3-bounded. Run analysis (a) to confirm.
+
+slots = 3
+
+produce: slots -> items
+consume: items -> slots
