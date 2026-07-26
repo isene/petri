@@ -6,6 +6,7 @@
 //! enabled transitions competing for the same tokens) are marked: they are
 //! the points the formalism leaves open.
 
+use crust::style;
 use crust::{Crust, Input, Pane, Popup};
 use std::collections::{HashSet, VecDeque};
 
@@ -425,7 +426,7 @@ impl App {
             self.net.places.len(),
             self.net.trans.len(),
             self.steps,
-            if self.running { "\x1b[1m\u{25b6} RUNNING\x1b[0m" } else { "" }
+            if self.running { style::bold("\u{25b6} RUNNING") } else { String::new() }
         ));
         self.header.refresh();
 
@@ -438,7 +439,7 @@ impl App {
 
         // --- places ---
         let name_w = self.net.places.iter().map(|p| p.name.len()).max().unwrap_or(6).max(6);
-        let mut pl = String::from(" \x1b[1mPLACES\x1b[0m\n");
+        let mut pl = format!(" {}\n", style::bold("PLACES"));
         for (i, p) in self.net.places.iter().enumerate() {
             let n = self.marking[i];
             let dots = if n == 0 {
@@ -449,13 +450,17 @@ impl App {
                 format!("\u{25cf}\u{00d7}{}", n)
             };
             let sel = self.focus == Focus::Places && i == self.pidx;
-            let selpre = if sel { format!("\x1b[48;5;{}m\x1b[38;5;231m", C_SEL_BG) } else { format!("\x1b[38;5;{}m", C_PLACE) };
+            let selpre = if sel {
+                format!("{}{}", style::set_bg(C_SEL_BG as u8), style::set_fg(231))
+            } else {
+                style::set_fg(C_PLACE as u8)
+            };
             pl.push_str(&format!(
-                " {}{:<nw$}  \x1b[38;5;{}m{}\x1b[0m\n",
+                " {}{:<nw$}  {}{}\n",
                 selpre,
                 p.name,
-                if n == 0 { C_DISABLED } else { C_TOKEN },
-                dots,
+                style::set_fg(if n == 0 { C_DISABLED as u8 } else { C_TOKEN as u8 }),
+                format_args!("{}{}", dots, style::RESET),
                 nw = name_w
             ));
         }
@@ -465,7 +470,7 @@ impl App {
 
         // --- transitions ---
         let tname_w = self.net.trans.iter().map(|t| t.name.len()).max().unwrap_or(8).max(8);
-        let mut tl = String::from(" \x1b[1mTRANSITIONS\x1b[0m\n");
+        let mut tl = format!(" {}\n", style::bold("TRANSITIONS"));
         for (t, tr) in self.net.trans.iter().enumerate() {
             let is_en = en.contains(&t);
             let confl = is_en && self.net.conflicts(&self.marking, t, &en);
@@ -477,16 +482,16 @@ impl App {
             } else {
                 ("\u{00b7}", C_DISABLED)
             };
-            let selpre = if sel { format!("\x1b[48;5;{}m", C_SEL_BG) } else { String::new() };
+            let selpre = if sel { style::set_bg(C_SEL_BG as u8) } else { String::new() };
             let namecol = if sel { 231 } else if is_en { 250 } else { C_DISABLED };
             tl.push_str(&format!(
-                " {}\x1b[38;5;{}m{} \x1b[38;5;{}m{:<tw$} \x1b[38;5;{}m{}\x1b[0m\n",
+                " {}{}{} {}{:<tw$} {}{}{}\n",
                 selpre,
-                col,
+                style::set_fg(col as u8),
                 mark,
-                namecol,
+                style::set_fg(namecol as u8),
                 tr.name,
-                if is_en { 250 } else { C_DISABLED },
+                style::set_fg(if is_en { 250 } else { C_DISABLED as u8 }),
                 self.net.arcs_str(t),
                 tw = tname_w
             ));
@@ -499,7 +504,7 @@ impl App {
         let cap = (self.logp.h as usize).saturating_sub(1).max(1);
         let lines: Vec<&str> = self.log.iter().map(|s| s.as_str()).collect();
         let tail = if lines.len() > cap { &lines[lines.len() - cap..] } else { &lines[..] };
-        let mut lg = String::from(" \x1b[1mTRACE\x1b[0m  (the run so far \u{2014} one path through the branching tree)\n");
+        let mut lg = format!(" {}  (the run so far \u{2014} one path through the branching tree)\n", style::bold("TRACE"));
         lg.push_str(&tail.join("\n"));
         self.logp.set_text(&lg);
         self.logp.refresh();
@@ -508,7 +513,7 @@ impl App {
         let status = if let Some(m) = self.msg.take() {
             m
         } else if en.is_empty() {
-            "\x1b[48;5;52m\x1b[38;5;231m DEADLOCK \u{2014} no enabled transitions \x1b[0m  u undo \u{00b7} R reset \u{00b7} a analyze".to_string()
+            format!("{}  u undo \u{00b7} R reset \u{00b7} a analyze", style::styled(" DEADLOCK \u{2014} no enabled transitions ", Some(231), Some(52), ""))
         } else {
             " Tab focus \u{00b7} Enter fire \u{00b7} Spc run \u{00b7} +/- tokens \u{00b7} u undo \u{00b7} R reset \u{00b7} a analyze \u{00b7} e edit \u{00b7} ? help \u{00b7} q quit".to_string()
         };
