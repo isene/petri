@@ -551,7 +551,7 @@ impl App {
         let w = 60.min(cols.saturating_sub(2)).max(20);
         let h = lines.min(rows.saturating_sub(2)).max(3);
         let mut pop = Popup::centered(w, h, 231, C_HEADER_BG);
-        pop.modal(content);
+        pop.view(content);
         self.after_popup();
     }
 
@@ -563,7 +563,7 @@ impl App {
         let w = 64.min(cols.saturating_sub(2)).max(20);
         let h = lines.min(rows.saturating_sub(2)).max(3);
         let mut pop = Popup::centered(w, h, 250, 233);
-        pop.modal(&content);
+        pop.view(&content);
         self.after_popup();
     }
 
