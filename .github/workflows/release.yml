@@ -122,10 +122,10 @@ jobs:
         run: |
           # The upload endpoint answers 500 when several files go up at once.
           tag=$GITHUB_REF_NAME
-          [ "$GITHUB_REF_TYPE" = tag ] || tag=$(gh release view --json tagName -q .tagName)
+          [ "$GITHUB_REF_TYPE" = tag ] || tag=$(gh release view -R "$GITHUB_REPOSITORY" --json tagName -q .tagName)
           for f in artifacts/*/*; do
             for try in 1 2 3; do
-              gh release upload "$tag" "$f" --clobber && break
+              gh release upload "$tag" "$f" --clobber -R "$GITHUB_REPOSITORY" && break
               echo "upload of $f failed; waiting 10 s"
               sleep 10
             done
