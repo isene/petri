@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2 (2026-11-18)
+
+- The version at the bottom right, amber once petri is rebuilt
+
 ## 0.1.0
 
 Initial release.

@@ -517,7 +517,7 @@ impl App {
         } else {
             " Tab focus \u{00b7} Enter fire \u{00b7} Spc run \u{00b7} +/- tokens \u{00b7} u undo \u{00b7} R reset \u{00b7} a analyze \u{00b7} e edit \u{00b7} ? help \u{00b7} q quit".to_string()
         };
-        self.status.set_text(&status);
+        self.status.set_text(&crust::with_version(&status, self.status.w as usize, "petri", env!("CARGO_PKG_VERSION")));
         self.status.refresh();
     }
 
